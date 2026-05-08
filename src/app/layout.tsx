@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://solgateskit.vercel.app"),
   title: "Solgateskit - Test pay-per-request APIs",
   description: "Test pay-per-request APIs on Solana devnet, testnet, and mainnet. Zero setup. Auto-creates wallets and handles 402 payments.",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
   openGraph: {
     title: "Solgateskit",
     description: "Test pay-per-request APIs. No wallet. No money. No setup.",
