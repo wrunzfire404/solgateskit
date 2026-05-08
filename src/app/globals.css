@@ -3,25 +3,87 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-0: #09090b;
+  --bg-1: #18181b;
+  --bg-2: #27272a;
+  --ink: #fafafa;
+  --ink-2: #a1a1aa;
+  --ink-3: #52525b;
+  --accent: #a78bfa;
+  --accent-dim: #7c3aed;
+  --accent-glow: rgba(167, 139, 250, 0.15);
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --border: #27272a;
+  --border-2: #3f3f46;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html, body { margin: 0; padding: 0; background: var(--bg-0); }
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Code blocks */
+code, pre {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+pre {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes flow-line {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #4ade80 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.1), 0 0 40px rgba(167, 139, 250, 0.05);
+}
+
+.glow-green {
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
 }
