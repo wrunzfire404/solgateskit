@@ -1,70 +1,89 @@
 "use client";
 
-import Link from "next/link";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 
 export default function DocsPage() {
   return (
-    <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--bg-0)]/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-sm">
-            <span className="w-5 h-5 rounded bg-[var(--accent)] flex items-center justify-center text-[10px] text-black font-black">S</span>
-            <span>Solgateskit</span>
-          </Link>
-          <div className="flex items-center gap-6 text-sm text-[var(--ink-2)]">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/playground" className="hover:text-white transition-colors">Playground</Link>
+    <main className="min-h-screen">
+      <Header />
+      <div className="pt-16">
+        <div className="mx-auto max-w-4xl px-6 py-16">
+          {/* Header */}
+          <div className="mb-12">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-widest text-purple-400">Documentation</span>
+            <h1 className="mt-2 text-3xl font-bold text-white">Getting Started</h1>
+            <p className="mt-3 text-sm text-zinc-500 max-w-lg">
+              Everything you need to integrate Solgateskit into your project. From zero to paid API in under 5 minutes.
+            </p>
           </div>
-        </div>
-      </nav>
 
-      <div className="max-w-3xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold mb-2">Documentation</h1>
-        <p className="text-[var(--ink-2)] mb-10">Everything you need to integrate Solgateskit into your project.</p>
+          {/* Sections */}
+          <div className="space-y-16">
+            {/* Install */}
+            <section>
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">1</span>
+                Installation
+              </h2>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+                  <span className="w-2 h-2 rounded-full bg-zinc-600" />
+                  <span className="font-mono text-[11px] text-zinc-600">terminal</span>
+                </div>
+                <div className="p-4 font-mono text-sm text-zinc-300">
+                  <span className="text-zinc-600">$</span> npm install solgateskit-sdk
+                </div>
+              </div>
+            </section>
 
-        {/* Installation */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> Installation
-          </h2>
-          <pre><code>{`npm install solgateskit-sdk`}</code></pre>
-        </section>
+            {/* Client */}
+            <section>
+              <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">2</span>
+                Client Usage
+              </h2>
+              <p className="text-sm text-zinc-500 mb-4 ml-8">
+                The client SDK wraps <code className="text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded text-xs">fetch()</code>.
+                When a server returns 402, the SDK handles payment and retries automatically.
+              </p>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="font-mono text-[11px] text-zinc-600">client.ts</span>
+                </div>
+                <pre className="p-4 font-mono text-[13px] leading-[1.7] text-zinc-400 overflow-x-auto !bg-transparent !border-0 !rounded-none !m-0">{`import { sgFetch } from "solgateskit-sdk";
 
-        {/* Client Usage */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> Client Usage
-          </h2>
-          <p className="text-[var(--ink-2)] mb-4 text-sm leading-relaxed">
-            The client SDK wraps the standard <code className="text-[var(--accent)] bg-[var(--bg-1)] px-1.5 py-0.5 rounded text-xs">fetch()</code> API.
-            When a server returns HTTP 402, the SDK automatically handles payment and retries.
-          </p>
-          <pre><code>{`import { sgFetch } from "solgateskit-sdk";
-
-// Basic usage - auto handles everything
+// Basic — auto handles everything
 const response = await sgFetch("https://api.example.com/premium");
 const data = await response.json();
 
 // With options
 const response = await sgFetch("https://api.example.com/data", {
   network: "devnet",     // devnet | testnet | mainnet
-  maxPayment: 0.01,     // Max SOL willing to pay per request
+  maxPayment: 0.01,     // Max SOL willing to pay
   onStep: (step) => {   // Lifecycle hooks
     console.log(step);  // "keygen" | "airdrop" | "payment" | "verify"
   },
-});`}</code></pre>
-        </section>
+});`}</pre>
+              </div>
+            </section>
 
-        {/* Server Usage */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> Server Middleware
-          </h2>
-          <p className="text-[var(--ink-2)] mb-4 text-sm leading-relaxed">
-            Add payment gating to any Express/Next.js route with a single function call.
-          </p>
-          <pre><code>{`import { sgGate } from "solgateskit-sdk/server";
+            {/* Server */}
+            <section>
+              <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">3</span>
+                Server Middleware
+              </h2>
+              <p className="text-sm text-zinc-500 mb-4 ml-8">
+                Add payment gating to any route with a single function call.
+              </p>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+                  <span className="w-2 h-2 rounded-full bg-purple-500" />
+                  <span className="font-mono text-[11px] text-zinc-600">server.ts</span>
+                </div>
+                <pre className="p-4 font-mono text-[13px] leading-[1.7] text-zinc-400 overflow-x-auto !bg-transparent !border-0 !rounded-none !m-0">{`import { sgGate } from "solgateskit-sdk/server";
 
 // Express middleware
 app.use("/api/premium", sgGate({
@@ -73,119 +92,114 @@ app.use("/api/premium", sgGate({
   network: "devnet",          // Network to verify on
 }));
 
-// Next.js API route (manual)
-export async function GET(request) {
-  const receipt = request.headers.get("X-Payment-Receipt");
-  
-  if (!receipt) {
-    return new Response(null, {
-      status: 402,
-      headers: {
-        "X-Payment-Request": JSON.stringify({
-          amount: 0.001,
-          recipient: "YOUR_WALLET",
-          network: "devnet",
-        }),
-      },
-    });
-  }
-
-  // Verify payment on-chain...
-  return Response.json({ data: "premium content" });
-}`}</code></pre>
-        </section>
-
-        {/* Protocol Spec */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> Protocol Specification
-          </h2>
-          <p className="text-[var(--ink-2)] mb-4 text-sm leading-relaxed">
-            Solgateskit uses standard HTTP headers to communicate payment requirements.
-          </p>
-
-          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-1)]">
-                  <th className="text-left px-4 py-2.5 font-medium text-[var(--ink-2)]">Header</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-[var(--ink-2)]">Direction</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-[var(--ink-2)]">Description</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-xs">
-                <tr className="border-b border-[var(--border)]">
-                  <td className="px-4 py-2.5 text-[var(--accent)]">X-Payment-Request</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">Server → Client</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">JSON with amount, recipient, network</td>
-                </tr>
-                <tr className="border-b border-[var(--border)]">
-                  <td className="px-4 py-2.5 text-[var(--accent)]">X-Payment-Receipt</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">Client → Server</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">Solana transaction signature</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-[var(--accent)]">X-Payment-Network</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">Client → Server</td>
-                  <td className="px-4 py-2.5 text-[var(--ink-2)]">devnet | testnet | mainnet</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Networks */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> Networks
-          </h2>
-          <div className="grid gap-3">
-            {[
-              { name: "Devnet", desc: "Free airdrop, unlimited testing. Default for development.", badge: "Recommended" },
-              { name: "Testnet", desc: "Free airdrop, closer to mainnet behavior. Good for staging.", badge: null },
-              { name: "Mainnet", desc: "Real SOL. Use for production deployments.", badge: "Production" },
-            ].map((net) => (
-              <div key={net.name} className="p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-1)] flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{net.name}</p>
-                  <p className="text-xs text-[var(--ink-2)] mt-0.5">{net.desc}</p>
-                </div>
-                {net.badge && (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
-                    {net.badge}
-                  </span>
-                )}
+app.get("/api/premium", (req, res) => {
+  // Only reached after payment verified
+  res.json({ data: "premium content" });
+});`}</pre>
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
 
-        {/* API Reference */}
-        <section className="mb-12">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <span className="text-[var(--accent)]">#</span> API Reference
-          </h2>
+            {/* Protocol */}
+            <section id="api-ref">
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">4</span>
+                Protocol Headers
+              </h2>
+              <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--bg-elevated)]">
+                      <th className="text-left px-4 py-3 font-medium text-zinc-400 text-xs">Header</th>
+                      <th className="text-left px-4 py-3 font-medium text-zinc-400 text-xs">Direction</th>
+                      <th className="text-left px-4 py-3 font-medium text-zinc-400 text-xs">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono text-xs">
+                    <tr className="border-b border-[var(--border)]">
+                      <td className="px-4 py-3 text-purple-400">X-Payment-Request</td>
+                      <td className="px-4 py-3 text-zinc-500">Server → Client</td>
+                      <td className="px-4 py-3 text-zinc-500">JSON: amount, recipient, network</td>
+                    </tr>
+                    <tr className="border-b border-[var(--border)]">
+                      <td className="px-4 py-3 text-purple-400">X-Payment-Receipt</td>
+                      <td className="px-4 py-3 text-zinc-500">Client → Server</td>
+                      <td className="px-4 py-3 text-zinc-500">Solana transaction signature</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-purple-400">X-Payment-Network</td>
+                      <td className="px-4 py-3 text-zinc-500">Client → Server</td>
+                      <td className="px-4 py-3 text-zinc-500">devnet | testnet | mainnet</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-          <h3 className="font-semibold mt-6 mb-2 text-sm">sgFetch(url, options?)</h3>
-          <p className="text-[var(--ink-2)] text-sm mb-3">Drop-in replacement for fetch() that handles 402 payment flow.</p>
-          <pre><code>{`interface SgFetchOptions {
+            {/* Networks */}
+            <section>
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">5</span>
+                Networks
+              </h2>
+              <div className="space-y-2">
+                {[
+                  { name: "Devnet", desc: "Free airdrop, unlimited testing. Default.", badge: "Recommended", badgeColor: "emerald" },
+                  { name: "Testnet", desc: "Free airdrop, closer to mainnet behavior.", badge: null, badgeColor: "" },
+                  { name: "Mainnet", desc: "Real SOL. Production deployments only.", badge: "Production", badgeColor: "yellow" },
+                ].map((net) => (
+                  <div key={net.name} className="flex items-center justify-between p-4 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)]">
+                    <div>
+                      <p className="font-medium text-sm text-white">{net.name}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{net.desc}</p>
+                    </div>
+                    {net.badge && (
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        net.badgeColor === "emerald" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                        "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                      }`}>
+                        {net.badge}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* API Reference */}
+            <section>
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-[10px] font-mono text-purple-400">6</span>
+                API Reference
+              </h2>
+
+              <div className="space-y-6">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                  <h3 className="font-mono text-sm font-semibold text-white mb-1">sgFetch(url, options?)</h3>
+                  <p className="text-xs text-zinc-500 mb-3">Drop-in replacement for fetch() that handles 402 payment flow.</p>
+                  <pre className="font-mono text-[12px] text-zinc-500 leading-relaxed !bg-[var(--surface)] !border-[var(--border)] p-3 rounded-lg">{`interface SgFetchOptions {
   network?: "devnet" | "testnet" | "mainnet";
   maxPayment?: number;    // Max SOL per request
   timeout?: number;       // Payment timeout in ms
   onStep?: (step: string, detail?: string) => void;
-}`}</code></pre>
+}`}</pre>
+                </div>
 
-          <h3 className="font-semibold mt-8 mb-2 text-sm">sgGate(config)</h3>
-          <p className="text-[var(--ink-2)] text-sm mb-3">Express middleware that gates routes behind Solana payment.</p>
-          <pre><code>{`interface SgGateConfig {
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                  <h3 className="font-mono text-sm font-semibold text-white mb-1">sgGate(config)</h3>
+                  <p className="text-xs text-zinc-500 mb-3">Express middleware that gates routes behind Solana payment.</p>
+                  <pre className="font-mono text-[12px] text-zinc-500 leading-relaxed !bg-[var(--surface)] !border-[var(--border)] p-3 rounded-lg">{`interface SgGateConfig {
   amount: number;         // SOL per request
   recipient: string;      // Your Solana wallet
   network: "devnet" | "testnet" | "mainnet";
-  memo?: string;          // Optional payment memo
-  expiresIn?: number;     // Payment validity in seconds (default: 300)
-}`}</code></pre>
-        </section>
+  expiresIn?: number;     // Payment validity (default: 300s)
+}`}</pre>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
-    </div>
+      <Footer />
+    </main>
   );
 }

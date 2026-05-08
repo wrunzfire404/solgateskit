@@ -1,265 +1,379 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { Keypair, Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-type StepStatus = "pending" | "active" | "done" | "error";
+type Network = "devnet" | "testnet" | "mainnet";
+type TabId = "logs" | "response" | "code";
 
-interface Step {
-  id: string;
-  label: string;
-  status: StepStatus;
-  detail?: string;
+interface Endpoint {
+  path: string;
+  method: string;
+  price: string;
+  priceNum: number;
+  desc: string;
+  free: boolean;
 }
 
-const DEVNET_URL = "https://api.devnet.solana.com";
+interface LogEntry {
+  time: string;
+  msg: string;
+  type: "info" | "success" | "error" | "step";
+}
+
+const ENDPOINTS: Endpoint[] = [
+  { path: "/api/gate", method: "GET", price: "0.001 SOL", priceNum: 0.001, desc: "Gated endpoint demo", free: false },
+];
+
+const NETWORKS: Record<Network, string> = {
+  devnet: "https://api.devnet.solana.com",
+  testnet: "https://api.testnet.solana.com",
+  mainnet: "https://api.mainnet-beta.solana.com",
+};
 
 export default function PlaygroundPage() {
-  const [steps, setSteps] = useState<Step[]>([]);
+  const [network, setNetwork] = useState<Network>("devnet");
+  const [selectedEndpoint, setSelectedEndpoint] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabId>("logs");
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [response, setResponse] = useState<string>("");
+  const [flowStep, setFlowStep] = useState(0);
 
-  const addLog = useCallback((msg: string) => {
-    setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  const log = useCallback((msg: string, type: LogEntry["type"] = "info") => {
+    const time = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setLogs((prev) => [...prev, { time, msg, type }]);
   }, []);
 
-  const updateStep = useCallback((id: string, status: StepStatus, detail?: string) => {
-    setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status, detail: detail || s.detail } : s))
-    );
-  }, []);
-
-  const runDemo = async () => {
+  const runRequest = async () => {
     setRunning(true);
-    setResult(null);
     setLogs([]);
-    setSteps([
-      { id: "keygen", label: "Generate Keypair", status: "pending" },
-      { id: "airdrop", label: "Airdrop SOL (devnet)", status: "pending" },
-      { id: "request", label: "Call API → 402", status: "pending" },
-      { id: "pay", label: "Pay on Solana", status: "pending" },
-      { id: "retry", label: "Retry with receipt → 200", status: "pending" },
-    ]);
+    setResponse("");
+    setFlowStep(1);
+
+    const endpoint = ENDPOINTS[selectedEndpoint];
 
     try {
       // Step 1: Generate keypair
-      updateStep("keygen", "active");
-      addLog("Generating ephemeral Solana keypair...");
+      log("Generating ephemeral Solana keypair...", "step");
       const keypair = Keypair.generate();
       const pubkey = keypair.publicKey.toBase58();
-      updateStep("keygen", "done", pubkey.slice(0, 8) + "..." + pubkey.slice(-4));
-      addLog(`Keypair generated: ${pubkey}`);
+      log(`Wallet: ${pubkey}`, "info");
+      setFlowStep(1);
 
       // Step 2: Airdrop
-      updateStep("airdrop", "active");
-      addLog("Requesting 1 SOL airdrop from devnet faucet...");
-      const connection = new Connection(DEVNET_URL, "confirmed");
+      log("Requesting airdrop from devnet faucet...", "step");
+      setFlowStep(2);
+      const connection = new Connection(NETWORKS[network], "confirmed");
 
-      let airdropSig: string;
       try {
-        airdropSig = await connection.requestAirdrop(keypair.publicKey, 1 * LAMPORTS_PER_SOL);
-        await connection.confirmTransaction(airdropSig, "confirmed");
-        const balance = await connection.getBalance(keypair.publicKey);
-        updateStep("airdrop", "done", `${(balance / LAMPORTS_PER_SOL).toFixed(3)} SOL`);
-        addLog(`Airdrop confirmed: ${airdropSig.slice(0, 12)}...`);
-        addLog(`Balance: ${(balance / LAMPORTS_PER_SOL).toFixed(3)} SOL`);
+        const sig = await connection.requestAirdrop(keypair.publicKey, LAMPORTS_PER_SOL);
+        await connection.confirmTransaction(sig, "confirmed");
+        const bal = await connection.getBalance(keypair.publicKey);
+        log(`Airdrop confirmed. Balance: ${(bal / LAMPORTS_PER_SOL).toFixed(4)} SOL`, "success");
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Airdrop failed";
-        updateStep("airdrop", "error", msg);
-        addLog(`ERROR: Airdrop failed - ${msg}`);
-        addLog("Devnet faucet may be rate-limited. Try again in a minute.");
+        log(`Airdrop failed: ${msg}`, "error");
+        log("Devnet faucet may be rate-limited. Try again in 60s.", "info");
         setRunning(false);
         return;
       }
 
-      // Step 3: Call API → get 402
-      updateStep("request", "active");
-      addLog("Calling /api/gate without payment...");
-      const res402 = await fetch("/api/gate");
-      if (res402.status !== 402) {
-        updateStep("request", "error", `Unexpected status: ${res402.status}`);
-        addLog(`ERROR: Expected 402, got ${res402.status}`);
+      // Step 3: Send request → 402
+      log(`Sending ${endpoint.method} ${endpoint.path}...`, "step");
+      setFlowStep(3);
+      const res402 = await fetch(endpoint.path);
+
+      if (res402.status === 402) {
+        const payHeader = res402.headers.get("X-Payment-Request");
+        const payReq = payHeader ? JSON.parse(payHeader) : null;
+        log(`← 402 Payment Required`, "info");
+        log(`   Amount: ${payReq?.amount} SOL | Recipient: ${payReq?.recipient?.slice(0, 8)}...`, "info");
+      } else {
+        log(`← ${res402.status} (expected 402)`, "error");
         setRunning(false);
         return;
       }
-      const paymentHeader = res402.headers.get("X-Payment-Request");
-      const paymentReq = paymentHeader ? JSON.parse(paymentHeader) : null;
-      updateStep("request", "done", `402 → Pay ${paymentReq?.amount || 0.001} SOL`);
-      addLog(`Got 402 Payment Required`);
-      addLog(`Payment terms: ${paymentReq?.amount} SOL to ${paymentReq?.recipient?.slice(0, 8)}...`);
 
-      // Step 4: Pay on Solana
-      updateStep("pay", "active");
-      const recipient = new PublicKey(paymentReq?.recipient || "11111111111111111111111111111111");
-      const amount = paymentReq?.amount || 0.001;
-      addLog(`Sending ${amount} SOL to ${recipient.toBase58().slice(0, 12)}...`);
+      // Step 4: Pay
+      log(`Sending ${endpoint.priceNum} SOL on-chain...`, "step");
+      setFlowStep(4);
+      const payHeader = res402.headers.get("X-Payment-Request");
+      const payReq = payHeader ? JSON.parse(payHeader) : { amount: 0.001, recipient: "11111111111111111111111111111111" };
 
-      const transaction = new Transaction().add(
+      const tx = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: keypair.publicKey,
-          toPubkey: recipient,
-          lamports: Math.round(amount * LAMPORTS_PER_SOL),
+          toPubkey: new PublicKey(payReq.recipient),
+          lamports: Math.round(payReq.amount * LAMPORTS_PER_SOL),
         })
       );
 
-      let paymentSig: string;
       try {
         const { blockhash } = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = keypair.publicKey;
-        transaction.sign(keypair);
-        paymentSig = await connection.sendRawTransaction(transaction.serialize());
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = keypair.publicKey;
+        tx.sign(keypair);
+        const paymentSig = await connection.sendRawTransaction(tx.serialize());
         await connection.confirmTransaction(paymentSig, "confirmed");
-        updateStep("pay", "done", paymentSig.slice(0, 12) + "...");
-        addLog(`Payment confirmed: ${paymentSig}`);
+        log(`Payment confirmed: ${paymentSig.slice(0, 16)}...`, "success");
+
+        // Step 5: Retry
+        log(`Retrying with payment receipt...`, "step");
+        setFlowStep(5);
+        const res200 = await fetch(endpoint.path, {
+          headers: {
+            "X-Payment-Receipt": paymentSig,
+            "X-Payment-Network": network,
+          },
+        });
+
+        const data = await res200.json();
+        if (res200.ok) {
+          log(`← 200 OK`, "success");
+          setResponse(JSON.stringify(data, null, 2));
+          setActiveTab("response");
+        } else {
+          log(`← ${res200.status}: ${data.error}`, "error");
+          setResponse(JSON.stringify(data, null, 2));
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Payment failed";
-        updateStep("pay", "error", msg);
-        addLog(`ERROR: Payment failed - ${msg}`);
-        setRunning(false);
-        return;
+        log(`Payment error: ${msg}`, "error");
       }
-
-      // Step 5: Retry with receipt
-      updateStep("retry", "active");
-      addLog("Retrying request with payment receipt...");
-      const res200 = await fetch("/api/gate", {
-        headers: {
-          "X-Payment-Receipt": paymentSig,
-          "X-Payment-Network": "devnet",
-        },
-      });
-
-      if (res200.ok) {
-        const data = await res200.json();
-        updateStep("retry", "done", "200 OK ✓");
-        addLog(`SUCCESS: 200 OK`);
-        addLog(`Response: ${JSON.stringify(data, null, 2)}`);
-        setResult(JSON.stringify(data, null, 2));
-      } else {
-        const err = await res200.json();
-        updateStep("retry", "error", `${res200.status}: ${err.error}`);
-        addLog(`ERROR: ${res200.status} - ${err.error}`);
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      addLog(`FATAL: ${msg}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      log(`Fatal: ${msg}`, "error");
     }
 
+    setFlowStep(0);
     setRunning(false);
   };
 
+  const codeExample = `import { sgFetch } from "solgateskit-sdk";
+
+const res = await sgFetch("${typeof window !== "undefined" ? window.location.origin : ""}${ENDPOINTS[selectedEndpoint].path}", {
+  network: "${network}",
+  onStep: (step) => console.log(step),
+});
+
+const data = await res.json();
+console.log(data);`;
+
   return (
-    <div className="min-h-screen">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--bg-0)]/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-sm">
-            <span className="w-5 h-5 rounded bg-[var(--accent)] flex items-center justify-center text-[10px] text-black font-black">S</span>
-            <span>Solgateskit</span>
-          </Link>
-          <div className="flex items-center gap-6 text-sm text-[var(--ink-2)]">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/docs" className="hover:text-white transition-colors">Docs</Link>
-          </div>
-        </div>
-      </nav>
+    <main className="min-h-screen">
+      <Header />
+      <div className="pt-16">
+        <section className="py-10 min-h-screen">
+          <div className="mx-auto max-w-7xl px-6">
+            {/* Page header */}
+            <div className="mb-8 flex items-end justify-between">
+              <div>
+                <span className="font-mono text-[11px] text-zinc-600 uppercase tracking-wider">Interactive</span>
+                <h1 className="mt-1 text-2xl font-bold text-white">Playground</h1>
+                <p className="mt-1 text-sm text-zinc-500">Run real HTTP 402 payment flows — live on Solana. No install needed.</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-600 font-mono">
+                <kbd className="px-1.5 py-0.5 rounded border border-zinc-800 bg-[var(--surface)] text-zinc-500">⌘</kbd>
+                <span>+</span>
+                <kbd className="px-1.5 py-0.5 rounded border border-zinc-800 bg-[var(--surface)] text-zinc-500">↵</kbd>
+                <span className="ml-1">to send</span>
+              </div>
+            </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold">Playground</h1>
-          <p className="text-[var(--ink-2)] mt-2">
-            Fire a real request against the demo API. Watch the full 402 → pay → 200 flow happen live on Solana devnet.
-          </p>
-        </div>
+            {/* Toolbar */}
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3">
+              <div className="flex items-center gap-2 pr-3 border-r border-[var(--border)]">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Chain</span>
+                <span className="flex items-center gap-1.5 rounded-md bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-[11px] font-medium text-purple-300">
+                  <svg width="10" height="10" viewBox="0 0 128 128" fill="currentColor"><circle cx="64" cy="64" r="64" /></svg>
+                  SOL
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Network</span>
+                <div className="flex gap-1">
+                  {(["devnet", "testnet", "mainnet"] as Network[]).map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setNetwork(n)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all capitalize ${
+                        network === n
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                          : "text-zinc-600 border border-[var(--border)] hover:border-[var(--border-hover)] hover:text-zinc-400"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-        <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
-          {/* Left: Steps + Button */}
-          <div>
-            <button
-              onClick={runDemo}
-              disabled={running}
-              className={`w-full py-3 rounded-lg font-medium text-sm transition-all ${
-                running
-                  ? "bg-[var(--bg-2)] text-[var(--ink-3)] cursor-not-allowed"
-                  : "bg-[var(--accent-dim)] text-white hover:bg-[var(--accent)]"
-              }`}
-            >
-              {running ? "Running..." : "▶ Run Demo Request"}
-            </button>
+            {/* Main grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
+              {/* Sidebar */}
+              <div className="space-y-4">
+                {/* Endpoints */}
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Endpoint</h3>
+                    <span className="font-mono text-[10px] text-zinc-700">GET</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {ENDPOINTS.map((ep, i) => (
+                      <button
+                        key={ep.path}
+                        onClick={() => setSelectedEndpoint(i)}
+                        className={`w-full text-left rounded-lg border px-3 py-2.5 transition-all ${
+                          selectedEndpoint === i
+                            ? "border-white/15 bg-[var(--surface)]"
+                            : "border-transparent hover:border-[var(--border)] hover:bg-[var(--surface)]/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs text-zinc-300 truncate">{ep.path}</span>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${
+                            ep.free ? "bg-emerald-500/10 text-emerald-400" : "bg-purple-500/10 text-purple-400"
+                          }`}>
+                            {ep.free ? "Free" : ep.price}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-zinc-600">{ep.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Steps */}
-            <div className="mt-6 space-y-3">
-              {steps.map((step) => (
-                <div
-                  key={step.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                    step.status === "active"
-                      ? "border-[var(--accent)]/50 bg-[var(--accent)]/5"
-                      : step.status === "done"
-                      ? "border-[var(--green)]/30 bg-[var(--green)]/5"
-                      : step.status === "error"
-                      ? "border-[var(--red)]/30 bg-[var(--red)]/5"
-                      : "border-[var(--border)] bg-[var(--bg-1)]"
+                {/* Send button */}
+                <button
+                  onClick={runRequest}
+                  disabled={running}
+                  className={`w-full flex items-center justify-center gap-2 h-11 rounded-xl font-semibold text-sm transition-all ${
+                    running
+                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                      : "bg-white text-black hover:bg-zinc-100 active:scale-[0.98]"
                   }`}
                 >
-                  {/* Status indicator */}
-                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                    step.status === "active" ? "bg-[var(--accent)] animate-pulse-dot" :
-                    step.status === "done" ? "bg-[var(--green)]" :
-                    step.status === "error" ? "bg-[var(--red)]" :
-                    "bg-[var(--ink-3)]"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{step.label}</p>
-                    {step.detail && (
-                      <p className="text-xs text-[var(--ink-2)] font-mono truncate mt-0.5">{step.detail}</p>
+                  {running ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                      Send Request
+                    </>
+                  )}
+                </button>
+
+                {/* Flow steps */}
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 space-y-2">
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600 mb-3">402 Flow</h3>
+                  {[
+                    { n: 1, label: "Generate keypair", color: "text-zinc-500" },
+                    { n: 2, label: "Airdrop SOL", color: "text-zinc-500" },
+                    { n: 3, label: "Server returns 402", color: "text-yellow-500" },
+                    { n: 4, label: "SDK pays on Solana", color: "text-purple-400" },
+                    { n: 5, label: "Retry → 200 OK", color: "text-emerald-400" },
+                  ].map((s) => (
+                    <div key={s.n} className={`flex items-center gap-2.5 ${flowStep === s.n ? "opacity-100" : flowStep > s.n ? "opacity-60" : "opacity-40"}`}>
+                      <span className={`font-mono text-[10px] font-bold w-4 ${flowStep >= s.n ? s.color : "text-zinc-700"}`}>{s.n}</span>
+                      <span className={`text-[11px] ${flowStep >= s.n ? "text-zinc-300" : "text-zinc-600"}`}>{s.label}</span>
+                      {flowStep === s.n && <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse ml-auto" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Main panel */}
+              <div className="min-h-[600px] flex flex-col">
+                {/* URL bar */}
+                <div className="flex items-center gap-2 mb-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2">
+                  <span className="font-mono text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">GET</span>
+                  <span className="font-mono text-xs text-zinc-500 flex-1 truncate">{ENDPOINTS[selectedEndpoint].path}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 bg-purple-500/10 text-purple-400">
+                    {ENDPOINTS[selectedEndpoint].price}
+                  </span>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex-1 flex flex-col rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
+                  <div className="flex items-center border-b border-[var(--border)]">
+                    {([
+                      { id: "logs" as TabId, label: "Flow Log", icon: "⚡" },
+                      { id: "response" as TabId, label: "Response", icon: ">" },
+                      { id: "code" as TabId, label: "Code", icon: "</>" },
+                    ]).map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 text-xs border-b-2 transition-colors ${
+                          activeTab === tab.id
+                            ? "text-white border-white"
+                            : "text-zinc-500 border-transparent hover:text-zinc-300"
+                        }`}
+                      >
+                        <span className="text-[10px]">{tab.icon}</span>
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tab content */}
+                  <div className="flex-1 overflow-y-auto terminal-scrollbar p-4" style={{ minHeight: "480px" }}>
+                    {activeTab === "logs" && (
+                      logs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-4">
+                          <div className="w-14 h-14 rounded-2xl border border-[var(--border)] bg-[var(--surface)] flex items-center justify-center">
+                            <span className="text-xl text-zinc-600">⚡</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-400">Select an endpoint and send a request</p>
+                            <p className="text-xs text-zinc-700 mt-1">The full HTTP 402 payment flow will stream here in real time</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1 font-mono text-xs">
+                          {logs.map((entry, i) => (
+                            <div key={i} className={`flex gap-2 ${
+                              entry.type === "error" ? "text-red-400" :
+                              entry.type === "success" ? "text-emerald-400" :
+                              entry.type === "step" ? "text-purple-300" :
+                              "text-zinc-500"
+                            }`}>
+                              <span className="text-zinc-700 shrink-0">{entry.time}</span>
+                              <span>{entry.msg}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    )}
+
+                    {activeTab === "response" && (
+                      response ? (
+                        <pre className="font-mono text-xs text-zinc-400 whitespace-pre-wrap">{response}</pre>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-sm text-zinc-600">
+                          No response yet. Send a request first.
+                        </div>
+                      )
+                    )}
+
+                    {activeTab === "code" && (
+                      <pre className="font-mono text-xs text-zinc-400 whitespace-pre-wrap">{codeExample}</pre>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Result */}
-            {result && (
-              <div className="mt-6 rounded-lg border border-[var(--green)]/30 bg-[var(--green)]/5 p-4">
-                <p className="text-xs font-mono text-[var(--green)] mb-2">✓ Response Data:</p>
-                <pre className="text-xs !bg-transparent !border-0 !p-0 text-[var(--ink-2)]">
-                  <code>{result}</code>
-                </pre>
               </div>
-            )}
-          </div>
-
-          {/* Right: Logs */}
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-1)] overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
-              <span className="text-xs font-mono text-[var(--ink-2)]">Console Output</span>
-            </div>
-            <div className="p-4 h-[500px] overflow-y-auto font-mono text-xs leading-relaxed">
-              {logs.length === 0 ? (
-                <p className="text-[var(--ink-3)] italic">Click &quot;Run Demo Request&quot; to start...</p>
-              ) : (
-                logs.map((log, i) => (
-                  <p
-                    key={i}
-                    className={`mb-1 ${
-                      log.includes("ERROR") ? "text-[var(--red)]" :
-                      log.includes("SUCCESS") ? "text-[var(--green)]" :
-                      "text-[var(--ink-2)]"
-                    }`}
-                  >
-                    {log}
-                  </p>
-                ))
-              )}
             </div>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+      <Footer />
+    </main>
   );
 }
